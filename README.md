@@ -1,3 +1,5 @@
+video = https://drive.google.com/file/d/1x5yYv7AY26vB74qkx5d8YeC0We7ItcJS/view?usp=sharing
+
 # 🎯 Accountability as a Service
 
 A decentralized accountability platform built on Solana that helps individuals and teams stay accountable for their goals through financial and social commitment.
