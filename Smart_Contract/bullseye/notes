@@ -1,0 +1,553 @@
+use anchor_lang::prelude::*;
+
+// TODO: Replace this with your actual program ID after deployment
+declare_id!("8ubScEZp4RR513qc6pNYgfVbRjTPiAuhqJvN2h4ueaRU");
+
+#[program]
+pub mod bullseye {
+    use super::*;
+
+    /// Initialize the goal counter for a user (one-time setup)
+    pub fn initialize_counter(ctx: Context<InitializeCounter>) -> Result<()> {
+        let goal_counter = &mut ctx.accounts.goal_counter;
+        goal_counter.user = ctx.accounts.user.key();
+        goal_counter.count = 0;
+        goal_counter.active_goal = None;
+        goal_counter.bump = ctx.bumps.goal_counter;
+        Ok(())
+    }
+
+    /// Initialize a new goal with locked SOL
+    pub fn initialize_goal(
+        ctx: Context<InitializeGoal>,
+        title: String,
+        description: String,
+        amount: u64,
+        deadline: i64,
+        fail_action: FailAction,
+        verifiers: [Pubkey; 3],
+    ) -> Result<()> {
+        // Validations
+        require!(title.len() <= 100, ErrorCode::TitleTooLong);
+        require!(description.len() <= 500, ErrorCode::DescriptionTooLong);
+        require!(amount >= 100_000_000, ErrorCode::AmountTooLow); // 0.1 SOL
+        require!(amount <= 10_000_000_000, ErrorCode::AmountTooHigh); // 10 SOL
+        
+        let clock = Clock::get()?;
+        require!(deadline > clock.unix_timestamp, ErrorCode::DeadlineInPast);
+
+        let goal = &mut ctx.accounts.goal;
+        let verification = &mut ctx.accounts.verification;
+        let goal_counter = &mut ctx.accounts.goal_counter;
+
+        // CRITICAL: Check if user already has an active goal
+        if let Some(_active_goal_number) = goal_counter.active_goal {
+            return Err(ErrorCode::ActiveGoalExists.into());
+        }
+
+        // Transfer SOL to Goal PDA
+        let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.user.key(),
+            &goal.key(),
+            amount,
+        );
+        
+        anchor_lang::solana_program::program::invoke(
+            &transfer_ix,
+            &[
+                ctx.accounts.user.to_account_info(),
+                goal.to_account_info(),
+            ],
+        )?;
+
+        // Initialize Goal account
+        goal.user = ctx.accounts.user.key();
+        goal.title = title;
+        goal.description = description;
+        goal.amount = amount;
+        goal.deadline = deadline;
+        goal.fail_action = fail_action;
+        goal.status = GoalStatus::Active;
+        goal.verification = verification.key();
+        goal.created_at = clock.unix_timestamp;
+        goal.goal_number = goal_counter.count;
+        goal.bump = ctx.bumps.goal;
+
+        // Initialize Verification account with provided verifiers
+        verification.goal = goal.key();
+        verification.verifiers = verifiers;
+        verification.yes_votes = 0;
+        verification.no_votes = 0;
+        verification.votes_cast = [false; 3];
+        verification.finalized = false;
+        verification.result = None;
+        verification.verification_deadline = 0;
+        verification.bump = ctx.bumps.verification;
+
+        // Mark this goal as active and increment counter
+        goal_counter.active_goal = Some(goal_counter.count);
+        goal_counter.count += 1;
+
+        emit!(GoalCreated {
+            goal: goal.key(),
+            user: ctx.accounts.user.key(),
+            amount,
+            deadline,
+            goal_number: goal.goal_number,
+        });
+
+        Ok(())
+    }
+
+    /// Submit goal for verification
+    pub fn submit_for_verification(ctx: Context<SubmitForVerification>) -> Result<()> {
+        let goal = &mut ctx.accounts.goal;
+        let verification = &mut ctx.accounts.verification;
+
+        require!(goal.status == GoalStatus::Active, ErrorCode::InvalidGoalStatus);
+        require!(ctx.accounts.user.key() == goal.user, ErrorCode::Unauthorized);
+
+        let clock = Clock::get()?;
+        
+        // Set 24 hour verification window
+        verification.verification_deadline = clock.unix_timestamp + 86400;
+        goal.status = GoalStatus::Submitted;
+
+        emit!(GoalSubmitted {
+            goal: goal.key(),
+            verification_deadline: verification.verification_deadline,
+        });
+
+        Ok(())
+    }
+
+    /// Cast vote (only callable by verifiers)
+    pub fn cast_vote(ctx: Context<CastVote>, vote: bool) -> Result<()> {
+        let verification = &mut ctx.accounts.verification;
+        let goal = &ctx.accounts.goal;
+
+        require!(goal.status == GoalStatus::Submitted, ErrorCode::InvalidGoalStatus);
+        require!(!verification.finalized, ErrorCode::AlreadyFinalized);
+
+        // Find verifier index
+        let verifier_pubkey = ctx.accounts.verifier.key();
+        let verifier_index = verification
+            .verifiers
+            .iter()
+            .position(|&v| v == verifier_pubkey)
+            .ok_or(ErrorCode::NotAVerifier)?;
+
+        // Check if already voted
+        require!(!verification.votes_cast[verifier_index], ErrorCode::AlreadyVoted);
+
+        // Record vote
+        verification.votes_cast[verifier_index] = true;
+        if vote {
+            verification.yes_votes += 1;
+        } else {
+            verification.no_votes += 1;
+        }
+
+        emit!(VoteCast {
+            goal: goal.key(),
+            verifier: verifier_pubkey,
+            vote,
+            yes_votes: verification.yes_votes,
+            no_votes: verification.no_votes,
+        });
+
+        // Auto-finalize if 2+ votes in either direction
+        if verification.yes_votes >= 2 {
+            verification.finalized = true;
+            verification.result = Some(VerificationResult::Success);
+            emit!(VerificationFinalized {
+                goal: goal.key(),
+                result: VerificationResult::Success,
+            });
+        } else if verification.no_votes >= 2 {
+            verification.finalized = true;
+            verification.result = Some(VerificationResult::Failure);
+            emit!(VerificationFinalized {
+                goal: goal.key(),
+                result: VerificationResult::Failure,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Finalize verification after deadline
+    pub fn finalize_verification(ctx: Context<FinalizeVerification>) -> Result<()> {
+        let verification = &mut ctx.accounts.verification;
+        let goal = &ctx.accounts.goal;
+        let clock = Clock::get()?;
+
+        require!(goal.status == GoalStatus::Submitted, ErrorCode::InvalidGoalStatus);
+        require!(!verification.finalized, ErrorCode::AlreadyFinalized);
+        require!(
+            clock.unix_timestamp >= verification.verification_deadline,
+            ErrorCode::VerificationNotComplete
+        );
+
+        // Determine result
+        if verification.yes_votes >= 2 {
+            verification.result = Some(VerificationResult::Success);
+        } else {
+            verification.result = Some(VerificationResult::Failure);
+        }
+
+        verification.finalized = true;
+
+        emit!(VerificationFinalized {
+            goal: goal.key(),
+            result: verification.result.unwrap(),
+        });
+
+        Ok(())
+    }
+
+    /// Claim funds or distribute based on result
+    pub fn claim_or_distribute(ctx: Context<ClaimOrDistribute>) -> Result<()> {
+        let goal = &mut ctx.accounts.goal;
+        let verification = &ctx.accounts.verification;
+        let goal_counter = &mut ctx.accounts.goal_counter;
+        let clock = Clock::get()?;
+
+        require!(goal.status == GoalStatus::Submitted, ErrorCode::InvalidGoalStatus);
+        require!(verification.finalized, ErrorCode::VerificationNotFinalized);
+
+        // Check deadline
+        let deadline_passed = clock.unix_timestamp > goal.deadline;
+
+        let result = if deadline_passed {
+            VerificationResult::Failure
+        } else {
+            verification.result.ok_or(ErrorCode::NoVerificationResult)?
+        };
+
+        match result {
+            VerificationResult::Success => {
+                require!(ctx.accounts.user.key() == goal.user, ErrorCode::Unauthorized);
+                
+                // Transfer SOL back to user
+                **goal.to_account_info().try_borrow_mut_lamports()? -= goal.amount;
+                **ctx.accounts.user.to_account_info().try_borrow_mut_lamports()? += goal.amount;
+
+                goal.status = GoalStatus::Claimed;
+
+                emit!(FundsClaimed {
+                    goal: goal.key(),
+                    user: goal.user,
+                    amount: goal.amount,
+                });
+            }
+            VerificationResult::Failure => {
+                // Distribute based on fail_action
+                **goal.to_account_info().try_borrow_mut_lamports()? -= goal.amount;
+                **ctx.accounts.recipient.to_account_info().try_borrow_mut_lamports()? += goal.amount;
+
+                match goal.fail_action {
+                    FailAction::Burn => {
+                        emit!(FundsBurned {
+                            goal: goal.key(),
+                            amount: goal.amount,
+                        });
+                    }
+                    FailAction::CompanyWallet => {
+                        emit!(FundsSentToCompany {
+                            goal: goal.key(),
+                            amount: goal.amount,
+                            recipient: ctx.accounts.recipient.key(),
+                        });
+                    }
+                }
+
+                goal.status = GoalStatus::Failed;
+            }
+        }
+
+        // CRITICAL: Clear active goal so user can create a new one
+        goal_counter.active_goal = None;
+
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Accounts
+// ============================================================================
+
+#[derive(Accounts)]
+pub struct InitializeCounter<'info> {
+    #[account(
+        init,
+        payer = user,
+        space = 8 + GoalCounter::INIT_SPACE,
+        seeds = [b"goal_counter", user.key().as_ref()],
+        bump
+    )]
+    pub goal_counter: Account<'info, GoalCounter>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeGoal<'info> {
+    #[account(
+        init,
+        payer = user,
+        space = 8 + Goal::INIT_SPACE,
+        seeds = [b"goal", user.key().as_ref(), &goal_counter.count.to_le_bytes()],
+        bump
+    )]
+    pub goal: Account<'info, Goal>,
+
+    #[account(
+        init,
+        payer = user,
+        space = 8 + Verification::INIT_SPACE,
+        seeds = [b"verification", goal.key().as_ref()],
+        bump
+    )]
+    pub verification: Account<'info, Verification>,
+
+    #[account(
+        mut,
+        seeds = [b"goal_counter", user.key().as_ref()],
+        bump = goal_counter.bump
+    )]
+    pub goal_counter: Account<'info, GoalCounter>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitForVerification<'info> {
+    #[account(
+        mut, 
+        seeds = [b"goal", goal.user.as_ref(), &goal.goal_number.to_le_bytes()], 
+        bump = goal.bump
+    )]
+    pub goal: Account<'info, Goal>,
+
+    #[account(mut, seeds = [b"verification", goal.key().as_ref()], bump = verification.bump)]
+    pub verification: Account<'info, Verification>,
+
+    pub user: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CastVote<'info> {
+    #[account(
+        seeds = [b"goal", goal.user.as_ref(), &goal.goal_number.to_le_bytes()], 
+        bump = goal.bump
+    )]
+    pub goal: Account<'info, Goal>,
+
+    #[account(mut, seeds = [b"verification", goal.key().as_ref()], bump = verification.bump)]
+    pub verification: Account<'info, Verification>,
+
+    pub verifier: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeVerification<'info> {
+    #[account(
+        seeds = [b"goal", goal.user.as_ref(), &goal.goal_number.to_le_bytes()], 
+        bump = goal.bump
+    )]
+    pub goal: Account<'info, Goal>,
+
+    #[account(mut, seeds = [b"verification", goal.key().as_ref()], bump = verification.bump)]
+    pub verification: Account<'info, Verification>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimOrDistribute<'info> {
+    #[account(
+        mut, 
+        seeds = [b"goal", goal.user.as_ref(), &goal.goal_number.to_le_bytes()], 
+        bump = goal.bump
+    )]
+    pub goal: Account<'info, Goal>,
+
+    #[account(seeds = [b"verification", goal.key().as_ref()], bump = verification.bump)]
+    pub verification: Account<'info, Verification>,
+
+    #[account(
+        mut,
+        seeds = [b"goal_counter", goal.user.as_ref()],
+        bump = goal_counter.bump
+    )]
+    pub goal_counter: Account<'info, GoalCounter>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    /// CHECK: Either burn address or company wallet
+    #[account(mut)]
+    pub recipient: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+#[account]
+#[derive(InitSpace)]
+pub struct Goal {
+    pub user: Pubkey,
+    #[max_len(100)]
+    pub title: String,
+    #[max_len(500)]
+    pub description: String,
+    pub amount: u64,
+    pub deadline: i64,
+    pub fail_action: FailAction,
+    pub status: GoalStatus,
+    pub verification: Pubkey,
+    pub created_at: i64,
+    pub goal_number: u64,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct GoalCounter {
+    pub user: Pubkey,
+    pub count: u64,              // Total goals created (increments forever)
+    pub active_goal: Option<u64>, // Currently active goal number (None if no active goal)
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Verification {
+    pub goal: Pubkey,
+    pub verifiers: [Pubkey; 3],
+    pub yes_votes: u8,
+    pub no_votes: u8,
+    pub votes_cast: [bool; 3],
+    pub finalized: bool,
+    pub result: Option<VerificationResult>,
+    pub verification_deadline: i64,
+    pub bump: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, InitSpace)]
+pub enum FailAction {
+    Burn,
+    CompanyWallet,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, InitSpace)]
+pub enum GoalStatus {
+    Active,
+    Submitted,
+    Claimed,
+    Failed,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace)]
+pub enum VerificationResult {
+    Success,
+    Failure,
+}
+
+// ============================================================================
+// Events
+// ============================================================================
+
+#[event]
+pub struct GoalCreated {
+    pub goal: Pubkey,
+    pub user: Pubkey,
+    pub amount: u64,
+    pub deadline: i64,
+    pub goal_number: u64,
+}
+
+#[event]
+pub struct GoalSubmitted {
+    pub goal: Pubkey,
+    pub verification_deadline: i64,
+}
+
+#[event]
+pub struct VoteCast {
+    pub goal: Pubkey,
+    pub verifier: Pubkey,
+    pub vote: bool,
+    pub yes_votes: u8,
+    pub no_votes: u8,
+}
+
+#[event]
+pub struct VerificationFinalized {
+    pub goal: Pubkey,
+    pub result: VerificationResult,
+}
+
+#[event]
+pub struct FundsClaimed {
+    pub goal: Pubkey,
+    pub user: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct FundsBurned {
+    pub goal: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct FundsSentToCompany {
+    pub goal: Pubkey,
+    pub amount: u64,
+    pub recipient: Pubkey,
+}
+
+// ============================================================================
+// Errors
+// ============================================================================
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Title must be 100 characters or less")]
+    TitleTooLong,
+    #[msg("Description must be 500 characters or less")]
+    DescriptionTooLong,
+    #[msg("Amount must be at least 0.1 SOL")]
+    AmountTooLow,
+    #[msg("Amount must be at most 10 SOL")]
+    AmountTooHigh,
+    #[msg("Deadline must be in the future")]
+    DeadlineInPast,
+    #[msg("Invalid goal status for this operation")]
+    InvalidGoalStatus,
+    #[msg("Unauthorized")]
+    Unauthorized,
+    #[msg("Not a registered verifier")]
+    NotAVerifier,
+    #[msg("Already voted")]
+    AlreadyVoted,
+    #[msg("Verification already finalized")]
+    AlreadyFinalized,
+    #[msg("Verification not complete yet")]
+    VerificationNotComplete,
+    #[msg("Verification not finalized")]
+    VerificationNotFinalized,
+    #[msg("No verification result available")]
+    NoVerificationResult,
+    #[msg("User already has an active goal. Complete it before creating a new one.")]
+    ActiveGoalExists,
+}

@@ -1,0 +1,1117 @@
+{
+  "address": "8ubScEZp4RR513qc6pNYgfVbRjTPiAuhqJvN2h4ueaRU",
+  "metadata": {
+    "name": "bullseye",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "BullsEye Accountability Platform"
+  },
+  "instructions": [
+    {
+      "name": "cast_vote",
+      "docs": [
+        "Cast vote (only callable by verifiers)"
+      ],
+      "discriminator": [
+        20,
+        212,
+        15,
+        189,
+        69,
+        180,
+        69,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "goal",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal.user",
+                "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verifier",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "vote",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "claim_or_distribute",
+      "docs": [
+        "Claim funds or distribute based on result"
+      ],
+      "discriminator": [
+        38,
+        154,
+        237,
+        250,
+        222,
+        128,
+        252,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "goal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal.user",
+                "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verification",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "goal_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal.user",
+                "account": "Goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_verification",
+      "docs": [
+        "Finalize verification after deadline"
+      ],
+      "discriminator": [
+        17,
+        156,
+        245,
+        109,
+        209,
+        118,
+        72,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "goal",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal.user",
+                "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_counter",
+      "docs": [
+        "Initialize the goal counter for a user (one-time setup)"
+      ],
+      "discriminator": [
+        67,
+        89,
+        100,
+        87,
+        231,
+        172,
+        35,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "goal_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_goal",
+      "docs": [
+        "Initialize a new goal with locked SOL"
+      ],
+      "discriminator": [
+        39,
+        182,
+        188,
+        87,
+        196,
+        228,
+        76,
+        96
+      ],
+      "accounts": [
+        {
+          "name": "goal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "account",
+                "path": "goal_counter.count",
+                "account": "GoalCounter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "goal_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        },
+        {
+          "name": "fail_action",
+          "type": {
+            "defined": {
+              "name": "FailAction"
+            }
+          }
+        },
+        {
+          "name": "verifiers",
+          "type": {
+            "array": [
+              "pubkey",
+              3
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "submit_for_verification",
+      "docs": [
+        "Submit goal for verification"
+      ],
+      "discriminator": [
+        189,
+        226,
+        55,
+        90,
+        224,
+        68,
+        108,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "goal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal.user",
+                "account": "Goal"
+              },
+              {
+                "kind": "account",
+                "path": "goal.goal_number",
+                "account": "Goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "goal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "signer": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Goal",
+      "discriminator": [
+        163,
+        66,
+        166,
+        245,
+        130,
+        131,
+        207,
+        26
+      ]
+    },
+    {
+      "name": "GoalCounter",
+      "discriminator": [
+        155,
+        23,
+        242,
+        215,
+        64,
+        160,
+        160,
+        184
+      ]
+    },
+    {
+      "name": "Verification",
+      "discriminator": [
+        230,
+        33,
+        140,
+        88,
+        132,
+        240,
+        116,
+        178
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "FundsBurned",
+      "discriminator": [
+        135,
+        68,
+        24,
+        12,
+        215,
+        232,
+        170,
+        26
+      ]
+    },
+    {
+      "name": "FundsClaimed",
+      "discriminator": [
+        202,
+        115,
+        101,
+        227,
+        91,
+        111,
+        239,
+        217
+      ]
+    },
+    {
+      "name": "FundsSentToCompany",
+      "discriminator": [
+        2,
+        35,
+        128,
+        131,
+        54,
+        211,
+        118,
+        81
+      ]
+    },
+    {
+      "name": "GoalCreated",
+      "discriminator": [
+        40,
+        74,
+        205,
+        224,
+        20,
+        51,
+        92,
+        239
+      ]
+    },
+    {
+      "name": "GoalSubmitted",
+      "discriminator": [
+        79,
+        188,
+        203,
+        248,
+        236,
+        8,
+        135,
+        132
+      ]
+    },
+    {
+      "name": "VerificationFinalized",
+      "discriminator": [
+        86,
+        204,
+        238,
+        243,
+        86,
+        75,
+        243,
+        13
+      ]
+    },
+    {
+      "name": "VoteCast",
+      "discriminator": [
+        39,
+        53,
+        195,
+        104,
+        188,
+        17,
+        225,
+        213
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "TitleTooLong",
+      "msg": "Title must be 100 characters or less"
+    },
+    {
+      "code": 6001,
+      "name": "DescriptionTooLong",
+      "msg": "Description must be 500 characters or less"
+    },
+    {
+      "code": 6002,
+      "name": "AmountTooLow",
+      "msg": "Amount must be at least 0.1 SOL"
+    },
+    {
+      "code": 6003,
+      "name": "AmountTooHigh",
+      "msg": "Amount must be at most 10 SOL"
+    },
+    {
+      "code": 6004,
+      "name": "DeadlineInPast",
+      "msg": "Deadline must be in the future"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidGoalStatus",
+      "msg": "Invalid goal status for this operation"
+    },
+    {
+      "code": 6006,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6007,
+      "name": "NotAVerifier",
+      "msg": "Not a registered verifier"
+    },
+    {
+      "code": 6008,
+      "name": "AlreadyVoted",
+      "msg": "Already voted"
+    },
+    {
+      "code": 6009,
+      "name": "AlreadyFinalized",
+      "msg": "Verification already finalized"
+    },
+    {
+      "code": 6010,
+      "name": "VerificationNotComplete",
+      "msg": "Verification not complete yet"
+    },
+    {
+      "code": 6011,
+      "name": "VerificationNotFinalized",
+      "msg": "Verification not finalized"
+    },
+    {
+      "code": 6012,
+      "name": "NoVerificationResult",
+      "msg": "No verification result available"
+    },
+    {
+      "code": 6013,
+      "name": "ActiveGoalExists",
+      "msg": "User already has an active goal. Complete it before creating a new one."
+    }
+  ],
+  "types": [
+    {
+      "name": "FailAction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Burn"
+          },
+          {
+            "name": "CompanyWallet"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundsBurned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundsClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundsSentToCompany",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Goal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "fail_action",
+            "type": {
+              "defined": {
+                "name": "FailAction"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "GoalStatus"
+              }
+            }
+          },
+          {
+            "name": "verification",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "goal_number",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoalCounter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "count",
+            "type": "u64"
+          },
+          {
+            "name": "active_goal",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoalCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "goal_number",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoalStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Submitted"
+          },
+          {
+            "name": "Claimed"
+          },
+          {
+            "name": "Failed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoalSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "verification_deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Verification",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "verifiers",
+            "type": {
+              "array": [
+                "pubkey",
+                3
+              ]
+            }
+          },
+          {
+            "name": "yes_votes",
+            "type": "u8"
+          },
+          {
+            "name": "no_votes",
+            "type": "u8"
+          },
+          {
+            "name": "votes_cast",
+            "type": {
+              "array": [
+                "bool",
+                3
+              ]
+            }
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "result",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "VerificationResult"
+                }
+              }
+            }
+          },
+          {
+            "name": "verification_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerificationFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "result",
+            "type": {
+              "defined": {
+                "name": "VerificationResult"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerificationResult",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Success"
+          },
+          {
+            "name": "Failure"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "goal",
+            "type": "pubkey"
+          },
+          {
+            "name": "verifier",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "bool"
+          },
+          {
+            "name": "yes_votes",
+            "type": "u8"
+          },
+          {
+            "name": "no_votes",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
